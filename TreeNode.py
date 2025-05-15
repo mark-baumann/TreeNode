@@ -1,6 +1,9 @@
 from binarytree import Node
+import heapq
 
-# Baum manuell bauen
+# ------------------------
+# Binärbaum manuell erstellen
+# ------------------------
 node11 = Node(11)
 node10 = Node(10, None, node11)
 node9 = Node(9, None, node10)
@@ -13,83 +16,90 @@ node3 = Node(3, None, node4)
 node2 = Node(2, node5, node6)
 root = Node(1, node2, node3)
 
-# Baum ausgeben
-print("Binärbaum:")
+# ------------------------
+# Ausgabe des Binärbaums
+# ------------------------
+print("Binärbaum-Struktur:\n")
 print(root)
 print("\n")
 
-# Traversierungen
-def inorder(node, result):
-    if node is None:
-        return
-    inorder(node.left, result)
-    result.append(node.value)
-    inorder(node.right, result)
+# ------------------------
+# Adjazenzliste mit Gewicht = 1 für jede Kante
+# ------------------------
+def build_graph(node):
+    graph = {}
 
-def preorder(node, result):
-    if node is None:
-        return
-    result.append(node.value)
-    preorder(node.left, result)
-    preorder(node.right, result)
+    def add_edge(u, v):
+        if u not in graph:
+            graph[u] = []
+        graph[u].append((v, 1))
 
-def postorder(node, result):
-    if node is None:
-        return
-    postorder(node.left, result)
-    postorder(node.right, result)
-    result.append(node.value)
-
-# Adjazenzliste (als Dict): node -> [left, right] wenn vorhanden
-def adjacency_list(node):
-    adj = {}
     def helper(n):
         if n is None:
             return
-        neighbors = []
         if n.left:
-            neighbors.append(n.left.value)
+            add_edge(n.value, n.left.value)
+            add_edge(n.left.value, n.value)
+            helper(n.left)
         if n.right:
-            neighbors.append(n.right.value)
-        adj[n.value] = neighbors
-        helper(n.left)
-        helper(n.right)
+            add_edge(n.value, n.right.value)
+            add_edge(n.right.value, n.value)
+            helper(n.right)
     helper(node)
-    return adj
+    return graph
 
-# Adjazenzmatrix: Liste aller Knoten, dann Matrix NxN mit 1/0 für Kanten
-def adjacency_matrix(adj_list):
-    nodes = sorted(adj_list.keys())  # sortiert nach Wert (Nummern/ Buchstaben)
-    index = {node: i for i, node in enumerate(nodes)}
-    size = len(nodes)
-    matrix = [[0]*size for _ in range(size)]
-    for u, neighbors in adj_list.items():
-        for v in neighbors:
-            matrix[index[u]][index[v]] = 1
-    return nodes, matrix
+graph = build_graph(root)
 
-# Ergebnisse sammeln
-inorder_result = []
-preorder_result = []
-postorder_result = []
+# ------------------------
+# Dijkstra-Algorithmus
+# ------------------------
+def dijkstra(graph, start):
+    distances = {node: float('inf') for node in graph}
+    previous_nodes = {}
+    distances[start] = 0
+    queue = [(0, start)]
 
-inorder(root, inorder_result)
-preorder(root, preorder_result)
-postorder(root, postorder_result)
+    while queue:
+        current_distance, current_node = heapq.heappop(queue)
+        if current_distance > distances[current_node]:
+            continue
 
-print("Inorder Traversierung:", inorder_result)
-print("Preorder Traversierung:", preorder_result)
-print("Postorder Traversierung:", postorder_result)
+        for neighbor, weight in graph[current_node]:
+            distance = current_distance + weight
+            if distance < distances[neighbor]:
+                distances[neighbor] = distance
+                previous_nodes[neighbor] = current_node
+                heapq.heappush(queue, (distance, neighbor))
 
-# Adjazenzliste ausgeben
-adj_list = adjacency_list(root)
-print("\nAdjazenzliste:")
-for node, neighbors in adj_list.items():
-    print(f"{node}: {neighbors}")
+    return distances, previous_nodes
 
-# Adjazenzmatrix ausgeben
-nodes, matrix = adjacency_matrix(adj_list)
-print("\nAdjazenzmatrix:")
-print("   " + " ".join(str(n) for n in nodes))
-for i, row in enumerate(matrix):
-    print(f"{nodes[i]:2} " + " ".join(str(x) for x in row))
+# ------------------------
+# Pfadrekonstruktion
+# ------------------------
+def reconstruct_path(prev, start, end):
+    path = []
+    current = end
+    while current != start:
+        path.append(current)
+        current = prev.get(current)
+        if current is None:
+            return []
+    path.append(start)
+    return path[::-1]
+
+# ------------------------
+# Ausführung
+# ------------------------
+start_node = root.value
+distances, prev = dijkstra(graph, start_node)
+
+print(f"Kürzeste Distanzen von Knoten {start_node}:")
+for node in sorted(graph):
+    print(f"  {node}: {distances[node]}")
+
+print("\nKürzeste Pfade von Wurzelknoten:")
+for target in sorted(graph):
+    if target == start_node:
+        continue
+    path = reconstruct_path(prev, start_node, target)
+    print(f"  {start_node} → {target}: {' → '.join(map(str, path))}")
